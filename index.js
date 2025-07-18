@@ -14,7 +14,7 @@ dotenv.config();
 
 // Configure multer for audio file uploads
 const upload = multer({
-  dest: 'uploads/',
+  storage: multer.memoryStorage(), // Use memory storage for serverless
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
       'audio/wav',
@@ -38,10 +38,7 @@ const upload = multer({
   },
 });
 
-// Create uploads directory if it doesn't exist
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
-}
+// Note: uploads directory not needed for serverless deployment
 
 //Middlewares
 app.use(express.json());
@@ -151,8 +148,8 @@ app.post(
         parsedHistory = history;
       }
 
-      // Read the uploaded audio file
-      const audioBuffer = fs.readFileSync(req.file.path);
+      // Read the uploaded audio file from memory buffer
+      const audioBuffer = req.file.buffer;
       const audioBase64 = audioBuffer.toString('base64');
 
       // Add system instruction for fun personality
@@ -211,20 +208,12 @@ Remember: Stay helpful and accurate, but make every interaction fun and memorabl
       const response = result.response;
       const reply = response.text();
 
-      // Clean up the uploaded file
-      fs.unlinkSync(req.file.path);
-
       res.json({
         reply,
         transcription: 'Audio processed successfully',
       });
     } catch (error) {
       console.error('Error processing audio:', error);
-
-      // Clean up file if it exists
-      if (req.file && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
 
       res
         .status(500)
@@ -233,6 +222,12 @@ Remember: Stay helpful and accurate, but make every interaction fun and memorabl
   },
 );
 
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
-});
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(port, () => {
+    console.log(`Example app listening on port ${port}`);
+  });
+}
+
+// Export for Vercel serverless deployment
+module.exports = app;
